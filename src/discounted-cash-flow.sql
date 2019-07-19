@@ -33,12 +33,16 @@ $$ language plpython3u;
 
 
 
+
+
+
 create or replace function internal_rate_of_return(
     cashflow double precision[])
 returns double precision as $$
     import numpy as np
     return np.irr(cashflow)
 $$ language plpython3u;
+
 
 
 
@@ -101,6 +105,9 @@ $$ language plpython3u;
 
 
 
+
+
+
 create or replace function internal_rate_of_return(
     cashflow double precision[],
     dates date[] )
@@ -121,6 +128,11 @@ returns double precision as $$
         return scipy.optimize.brentq(lambda r: xnpv(r, cashflow, date_vals), -1.0, 1e10)
 
 $$ language plpython3u;
+
+
+
+
+
 
 
 

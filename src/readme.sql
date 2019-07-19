@@ -44,5 +44,9 @@ set schema 'financial_functions';
 
 
 
+\ir black-scholes-option-pricing.sql
+
+
+
 set search_path to default;
 

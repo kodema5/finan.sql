@@ -110,6 +110,7 @@ $$ language plpython3u;
 
 
 
+
 create or replace function rate (
     nper double precision,
     pmt double precision,

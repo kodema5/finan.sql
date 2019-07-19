@@ -1,6 +1,6 @@
 # discounted cash-flow analysis
 
-- rate is the alternative interest rate from other source vs the investment cashflow
+rate is the alternative interest rate from other source vs the investment cashflow
 
 `net_present_value(rate, cashflow=[])`
 
@@ -22,14 +22,17 @@
 > $$ language plpython3u;
 -->
 
-- given a discount-rate 10%, a 10000 investments returns cashflow as below. this investment's worth now is:
-    ```
-    > select net_present_value(0.1, array[-10000,3000,4200,6800]::double precision[]);
-    net_present_value
-    -------------------
-    1307.28775356874
-    ```
-- excel has a [different](https://feasibility.pro/npv-calculation-in-excel-numbers-not-match/) way to calc
+given a discount-rate 10%, a 10000 investments returns cashflow as below. this investment's worth now is:
+```
+ > select net_present_value(
+ >   0.1,
+ >   array[-10000,3000,4200,6800]::double precision[]);
+net_present_value
+-------------------
+1307.28775356874
+```
+excel has a [different](https://feasibility.pro/npv-calculation-in-excel-numbers-not-match/) way to calc
+
 
 `internal_rate_of_return(rate, cashflow=[])`
 <!--
@@ -41,13 +44,14 @@
 > $$ language plpython3u;
 -->
 
-- given a set of cashflow, what rate is which gives net-present-value = 0
-    ```
-    > select internal_rate_of_return(array[-10000,3000,4200,6800]::double precision[]);
-    internal_rate_of_return
-    -------------------------
-        0.163405600688989
-    ```
+given a set of cashflow, what rate is which gives net-present-value = 0
+```
+ > select internal_rate_of_return(
+ >   array[-10000,3000,4200,6800]::double precision[]);
+internal_rate_of_return
+-------------------------
+    0.163405600688989
+```
 
 `modified_internal_rate_of_return(cashflow=[], rate, reinvest_rate)`
 <!--
@@ -61,14 +65,14 @@
 > $$ language plpython3u;
 -->
 
-- a 10k loan generates a cashflow. a 10% interest for the 10k loan, and 12% for reinvested profits
-    ```
-    > select modified_internal_rate_of_return(array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12);
-    modified_internal_rate_of_return
-    ----------------------------------
-                    0.151471336646763
-    ```
-
+a 10k loan generates a cashflow. a 10% interest for the 10k loan, and 12% for reinvested profits
+```
+ > select modified_internal_rate_of_return(
+ >   array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12);
+modified_internal_rate_of_return
+----------------------------------
+                0.151471336646763
+```
 
 
 `net_present_value(rate, cashflow=[], dates=[])`
@@ -90,13 +94,16 @@ ref: https://stackoverflow.com/questions/8919718/financial-python-library-that-h
 > $$ language plpython3u;
 -->
 
-- a -1000 loan at 1/1/2018, returns cashflow as below with 10% discount rate; its values now is:
-    ```
-    > select net_present_value(0.1, array[-1000, 250, 250, 250, 250, 250]::double precision[], array[date '2018-1-1', date '2018-6-1', date '2018-12-1', date '2019-3-1', date '2019-9-1', date '2019-12-30']::date[]);
-    net_present_value
-    -------------------
-    113.271525238905
-    ```
+a -1000 loan at 1/1/2018, returns cashflow as below with 10% discount rate; its values now is:
+```
+ > select net_present_value(
+ >   0.1,
+ >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
+ >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
+net_present_value
+-------------------
+113.271525238905
+```
 
 `internal_rate_of_return(cashflow=[], dates=[])`
 
@@ -123,15 +130,20 @@ ref: https://stackoverflow.com/questions/8919718/financial-python-library-that-h
 > $$ language plpython3u;
 -->
 
-- a -1000 loan at 1/1/2018, returns cashflow as below; rate of return for net-present-value ~ 0
-    ```
-    > select internal_rate_of_return(array[-1000, 250, 250, 250, 250, 250]::double precision[], array[date '2018-1-1', date '2018-6-1', date '2018-12-1', date '2019-3-1', date '2019-9-1', date '2019-12-30']::date[]);
-    internal_rate_of_return
-    -------------------------
-        0.204099471443879
+a -1000 loan at 1/1/2018, returns cashflow as below; rate of return for net-present-value ~ 0
+```
+ > select internal_rate_of_return(
+ >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
+ >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
+internal_rate_of_return
+-------------------------
+    0.204099471443879
 
-    > select net_present_value(0.204099471443879, array[-1000, 250, 250, 250, 250, 250]::double precision[], array[date '2018-1-1', date '2018-6-1', date '2018-12-1', date '2019-3-1', date '2019-9-1', date '2019-12-30']::date[]);
-    net_present_value
-    ----------------------
-    3.38218342221808e-12
-    ```
+ > select net_present_value(
+ >   0.204099471443879,
+ >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
+ >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
+net_present_value
+----------------------
+3.38218342221808e-12
+```

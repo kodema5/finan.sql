@@ -42,6 +42,10 @@ psql -f src\readme.sql
 > \ir discounted-cash-flow.sql
 -->
 
+- [`black-scholes option-pricing`](black-scholes-option-pricing.md) calculates the options pricing and it sensitivity with black-scholes model
+<!--
+> \ir black-scholes-option-pricing.sql
+-->
 
 <!--
 > set search_path to default;
