@@ -12,7 +12,14 @@
 > returns double precision as $$
 >     import numpy as np
 >     return np.fv(rate, nper, pmt, pv, due)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
+
+> create or replace function finan_tests.test_future_values() returns setof text as $$
+> begin
+>   return next ok(floor(future_value(0.1/4, 4*4, -2000, 0, 1)) = 39729, 'can calc');
+>   return next ok(future_value(null, 4*4, -2000) is null, 'is strict');
+> end;
+> $$ language plpgsql;
 -->
 
 invest 1000/month for 5 years with compounded at 5%/yr
@@ -43,9 +50,15 @@ future_value
 > returns double precision as $$
 >   import numpy as np
 >   return np.pv(rate, nper, pmt, fv, due)
-> $$ language plpython3u;
--->
+> $$ language plpython3u strict;
 
+> create or replace function finan_tests.test_present_values() returns setof text as $$
+> begin
+>   return next ok(floor(present_value(0.045/12, 5*12, -93.22)) = 5000, 'can calc');
+>   return next ok(present_value(null, 5*12, -93.22) is null, 'is strict');
+> end;
+> $$ language plpgsql;
+-->
 
 cd pays 100/mo with 5.5%/year for 5 years. buy if less than present-value
 ```
@@ -75,7 +88,14 @@ present_value
 > returns double precision as $$
 >   import numpy as np
 >   return np.pmt(rate, nper, pv, fv, due)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
+
+> create or replace function finan_tests.test_payment() returns setof text as $$
+> begin
+>   return next ok(trunc(payment(0.045/12, 5*12, 5000)) = -93, 'can calc');
+>   return next ok(payment(0.045, 5*12, null) is null, 'is strict');
+> end;
+> $$ language plpgsql;
 -->
 
 a loan of 5000, with 4.5%, for 5 years. payment per period is:
@@ -85,6 +105,7 @@ a loan of 5000, with 4.5%, for 5 years. payment per period is:
 ------------------
 -93.215096207585
 ```
+
 
 `number_of_periods(rate, pmt, pv, fv=0, due=0/1)`
 
@@ -98,7 +119,7 @@ a loan of 5000, with 4.5%, for 5 years. payment per period is:
 > returns double precision as $$
 >   import numpy as np
 >   return np.nper(rate, pmt, pv, fv, due)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
 -->
 
 a loan of 5000, with 4.5%, paid 100/mo, will take
@@ -123,7 +144,7 @@ a loan of 5000, with 4.5%, paid 100/mo, will take
 > returns double precision as $$
 >   import numpy as np
 >   return np.rate(nper, pmt, pv, fv, due, guess, tol, maxiter)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
 -->
 
 a loan of 5000, paid 100/mo, for 5 years
@@ -146,7 +167,7 @@ a loan of 5000, paid 100/mo, for 5 years
 > returns double precision as $$
 >     import numpy as np
 >     return np.ppmt(rate, per, nper, pv, fv, due)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
 -->
 `interest_payment(rate, per, nper, pv, fv=0, due=0/1)`
 <!--
@@ -160,7 +181,7 @@ a loan of 5000, paid 100/mo, for 5 years
 > returns double precision as $$
 >   import numpy as np
 >   return np.ipmt(rate, per, nper, pv, fv, due)
-> $$ language plpython3u;
+> $$ language plpython3u strict;
 -->
 
 a loan of 5000, with 4.5%, for 5 years. payment per period is, on the 12th month,

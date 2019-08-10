@@ -19,15 +19,20 @@ see [pg-financial-functions.dockerfile](pg-financial-functions.dockerfile) for d
 psql -f src\readme.sql
 ```
 
-## in financial_functions schema
+## in finan schema
 
 <!--
-> drop schema if exists financial_functions cascade;
-> create schema financial_functions;
+> drop schema if exists finan_tests cascade;
+> create schema finan_tests;
+-->
+
+<!--
+> drop schema if exists finan cascade;
+> create schema finan;
 -->
 
 ```
-> set schema 'financial_functions';
+> set schema 'finan';
 ```
 
 ## topics
@@ -49,4 +54,17 @@ psql -f src\readme.sql
 
 <!--
 > set search_path to default;
+-->
+
+<!--
+> select exists (select 1 from pg_available_extensions where name='pgtap') as has_pgtap
+> \gset
+
+> \if :has_pgtap
+> set search_path TO finan_tests, finan, public;
+> create extension if not exists pgtap with schema finan_tests;
+> select * from runtests('finan_tests'::name);
+> \endif
+
+> drop schema finan_tests cascade;
 -->
