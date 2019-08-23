@@ -1,6 +1,6 @@
 # pg financial functions
 
-plpgsql + plpython3 based financial functions
+some plpgsql + plpython3 based financial functions
 
 <!--
 > select
@@ -26,13 +26,9 @@ psql -f src\readme.sql
 <!--
 > drop schema if exists finan_tests cascade;
 > create schema finan_tests;
--->
-
-<!--
 > drop schema if exists finan cascade;
 > create schema finan;
 -->
-
 ```
 > set schema 'finan';
 ```
@@ -44,10 +40,11 @@ psql -f src\readme.sql
 
 ## [fixed-rate functions](#fixed-rate-functions)
 
-### `future_value(rate, nper, pmt, pv=0, due=0/1)`
+### `finan.fv( rate, nper, pmt, pv=0, due=0/1 )`
+future value
 
 <!--
-> create or replace function future_value(
+> create or replace function fv (
 >     rate double precision,
 >     nper double precision,
 >     pmt double precision default 0,
@@ -58,34 +55,35 @@ psql -f src\readme.sql
 >     return np.fv(rate, nper, pmt, pv, due)
 > $$ language plpython3u immutable strict;
 
-> create or replace function finan_tests.test_future_values() returns setof text as $$
+> create or replace function finan_tests.test_fv() returns setof text as $$
 > begin
->   return next ok(floor(future_value(0.1/4, 4*4, -2000, 0, 1)) = 39729, 'can calc');
->   return next ok(future_value(null, 4*4, -2000) is null, 'is strict');
+>   return next ok(floor(fv(0.1/4, 4*4, -2000, 0, 1)) = 39729, 'can calc');
+>   return next ok(fv(null, 4*4, -2000) is null, 'is strict');
 > end;
 > $$ language plpgsql;
 -->
 
 invest 1000/month for 5 years with compounded at 5%/yr
 ```
-> select future_value(0.05/12, 5*12, -1000);
-future_value
+> select fv(0.05/12, 5*12, -1000);
+        fv
 ------------------
-68006.0828408428
-```
+ 68006.0828408428
+ ```
 
 invest on start of quarters, 2000/q for 4 years with rate 10%/year
 ```
-> select future_value(0.1/4, 4*4, -2000, 0, 1);
-future_value
+> select fv(0.1/4, 4*4, -2000, 0, 1);
+        fv
 ------------------
-39729.4608941661
+ 39729.4608941661
 ```
 
-### `present_value(rate, nper, pmt, fv=0, due=0/1)`
+### `finan.pv( rate, nper, pmt, fv=0, due=0/1 )`
+present value
 
 <!--
-> create or replace function present_value(
+> create or replace function pv(
 >   rate double precision,
 >   nper double precision,
 >   pmt double precision,
@@ -96,34 +94,35 @@ future_value
 >   return np.pv(rate, nper, pmt, fv, due)
 > $$ language plpython3u strict;
 
-> create or replace function finan_tests.test_present_values() returns setof text as $$
+> create or replace function finan_tests.test_pv() returns setof text as $$
 > begin
->   return next ok(floor(present_value(0.045/12, 5*12, -93.22)) = 5000, 'can calc');
->   return next ok(present_value(null, 5*12, -93.22) is null, 'is strict');
+>   return next ok(floor(pv(0.045/12, 5*12, -93.22)) = 5000, 'can calc');
+>   return next ok(pv(null, 5*12, -93.22) is null, 'is strict');
 > end;
 > $$ language plpgsql;
 -->
 
 cd pays 100/mo with 5.5%/year for 5 years. buy if less than present-value
 ```
-> select present_value(0.055/12, 5*12, 100);
-present_value
+> select pv(0.055/12, 5*12, 100);
+        pv
 ------------------
--5235.2835445651
+ -5235.2835445651
 ```
 
 a loan of 4.5%, 93.22 payment for 5 years. the original loan is:
 ```
-> select present_value(0.045/12, 5*12, -93.22);
-present_value
+> select pv(0.045/12, 5*12, -93.22);
+        pv
 ------------------
-5000.26303638651
+ 5000.26303638651
 ```
 
-### `payment(rate, nper, pv, fv=0, due=0/1)`
+### `finan.pmt( rate, nper, pv, fv=0, due=0/1 )`
+payment per period
 
 <!--
-> create or replace function payment(
+> create or replace function pmt(
 >   rate double precision,
 >   nper double precision,
 >   pv double precision,
@@ -134,27 +133,33 @@ present_value
 >   return np.pmt(rate, nper, pv, fv, due)
 > $$ language plpython3u immutable strict;
 
-> create or replace function finan_tests.test_payment() returns setof text as $$
+> create or replace function finan_tests.test_pmt() returns setof text as $$
 > begin
->   return next ok(trunc(payment(0.045/12, 5*12, 5000)) = -93, 'can calc');
->   return next ok(payment(0.045, 5*12, null) is null, 'is strict');
+>   return next ok(trunc(pmt(0.045/12, 5*12, 5000)) = -93, 'can calc');
+>   return next ok(pmt(0.045, 5*12, null) is null, 'is strict');
 > end;
 > $$ language plpgsql;
 -->
 
 a loan of 5000, with 4.5%, for 5 years. payment per period is:
 ```
-> select payment(0.045/12, 5*12, 5000);
-    payment
+> select pmt(0.045/12, 5*12, 5000);
+      pmt
 ------------------
 -93.215096207585
+
+> select pmt(0.045/12, 5*12, 5000) * 5*12 + 5000 as total_interest_payments;
+  total_interest_payments
+-------------------------
+         -592.9057724551
 ```
 
 
-### `number_of_periods(rate, pmt, pv, fv=0, due=0/1)`
+### `finan.nper( rate, pmt, pv, fv=0, due=0/1 )`
+number of periods
 
 <!--
-> create or replace function number_of_periods (
+> create or replace function nper (
 >   rate double precision,
 >   pmt double precision,
 >   pv double precision,
@@ -168,13 +173,14 @@ a loan of 5000, with 4.5%, for 5 years. payment per period is:
 
 a loan of 5000, with 4.5%, paid 100/mo, will take
 ```
-> select number_of_periods(0.045/12, -100, 5000);
-    periods
+> select nper(0.045/12, -100, 5000);
+      nper
 ------------------
 55.4742521906629
 ```
 
-### `rate(nper, pmt, pv, fv=0, due=0/1, guess=0.1, tol=1e-6, max_iter=1000)`
+### `finan.rate( nper, pmt, pv, fv=0, due=0/1, guess=0.1, tol=1e-6, max_iter=1000 )`
+interest rate
 <!--
 > create or replace function rate (
 >   nper double precision,
@@ -199,9 +205,10 @@ a loan of 5000, paid 100/mo, for 5 years
 0.0450215684902132
 ```
 
-### `principal_payment(rate, per, nper, pv, fv=0, due=0/1)`
+### `finan.ppmt( rate, per, nper, pv, fv=0, due=0/1 )`
+principal payment in period, per
 <!--
-> create or replace function principal_payment(
+> create or replace function ppmt(
 >     rate double precision,
 >     per double precision,
 >     nper double precision,
@@ -213,10 +220,18 @@ a loan of 5000, paid 100/mo, for 5 years
 >     return np.ppmt(rate, per, nper, pv, fv, due)
 > $$ language plpython3u immutable strict;
 -->
+a loan of 5000, with 4.5%, for 5 years. payment per period is, on the 12th month,
+```
+> select ppmt(0.045/12, 12, 5*12, 5000);
+      ppmt
+-------------------
+-77.595028342707
+```
 
-### `interest_payment(rate, per, nper, pv, fv=0, due=0/1)`
+### `finan.ipmt( rate, per, nper, pv, fv=0, due=0/1 )`
+interest payment in period, per
 <!--
-> create or replace function interest_payment(
+> create or replace function ipmt(
 >   rate double precision,
 >   per double precision,
 >   nper double precision,
@@ -231,16 +246,16 @@ a loan of 5000, paid 100/mo, for 5 years
 
 a loan of 5000, with 4.5%, for 5 years. payment per period is, on the 12th month,
 ```
-> select payment(0.045/12, 5*12, 5000);
-    payment
+> select pmt(0.045/12, 5*12, 5000);
+    pmt
 ------------------
 -93.215096207585
-> select principal_payment(0.045/12, 12, 5*12, 5000);
-principal_payment
+> select ppmt(0.045/12, 12, 5*12, 5000);
+      ppmt
 -------------------
 -77.595028342707
-> select interest_payment(0.045/12, 12, 5*12, 5000);
-interest_payment
+> select ipmt(0.045/12, 12, 5*12, 5000);
+      ipmt
 ------------------
 -15.620067864878
 ```
@@ -250,10 +265,11 @@ interest_payment
 for rate-of-return/net-present-value over an investment cashflow.
 rate is the alternative interest rate from other source vs the investment cashflow
 
-### `net_present_value(rate, cashflow=[])`
+### `finan.npv( rate, cashflow=[] )`
+net present value
 
 <!--
-> create or replace function net_present_value(
+> create or replace function npv(
 >   rate double precision,
 >   cashflow double precision[])
 > returns double precision as $$
@@ -261,7 +277,7 @@ rate is the alternative interest rate from other source vs the investment cashfl
 >   return np.npv(rate, cashflow)
 > $$ language plpython3u immutable strict;
 
-> create or replace function net_present_value(
+> create or replace function npv(
 >   rate double precision[],
 >   cashflow double precision[])
 > returns double precision as $$
@@ -272,19 +288,20 @@ rate is the alternative interest rate from other source vs the investment cashfl
 
 given a discount-rate 10%, a 10000 investments returns cashflow as below. this investment's worth now is:
 ```
-> select net_present_value(
+> select npv(
 >   0.1,
 >   array[-10000,3000,4200,6800]::double precision[]);
-net_present_value
+      npv
 -------------------
 1307.28775356874
 ```
 excel has a [different](https://feasibility.pro/npv-calculation-in-excel-numbers-not-match/) way to calc
 
 
-### `internal_rate_of_return(rate, cashflow=[])`
+### `finan.irr( rate, cashflow=[] )`
+internal rate of return
 <!--
-> create or replace function internal_rate_of_return(
+> create or replace function irr (
 >   cashflow double precision[])
 > returns double precision as $$
 >   import numpy as np
@@ -294,16 +311,16 @@ excel has a [different](https://feasibility.pro/npv-calculation-in-excel-numbers
 
 given a set of cashflow, what rate is which gives net-present-value = 0
 ```
-> select internal_rate_of_return(
->   array[-10000,3000,4200,6800]::double precision[]);
-internal_rate_of_return
--------------------------
-    0.163405600688989
-```
+> select irr(array[-10000,3000,4200,6800]::double precision[]);
+        irr
+-------------------
+ 0.163405600688989
+ ```
 
-### `modified_internal_rate_of_return(cashflow=[], rate, reinvest_rate)`
+### `finan.mirr( cashflow=[], rate, reinvest_rate )`
+modified internal rate of return
 <!--
-> create or replace function modified_internal_rate_of_return(
+> create or replace function mirr(
 >   cashflow double precision[],
 >   rate double precision,     -- rate on cashflow
 >   reinvest_rate double precision) -- rate on cashflow reinvestment
@@ -314,10 +331,10 @@ internal_rate_of_return
 
 > create or replace function finan_tests.test_modified_internal_rate_of_return() returns setof text as $$
 > begin
->   return next ok(trunc(modified_internal_rate_of_return(
+>   return next ok(trunc(mirr(
 >       array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12) * 100) = 15, 'can calc');
->   return next ok(modified_internal_rate_of_return(null, null, null) is null, 'is strict');
->   return next ok((modified_internal_rate_of_return(
+>   return next ok(mirr(null, null, null) is null, 'is strict');
+>   return next ok((mirr(
 >       array[]::double precision[], 0.1, 0.12) = 'NaN'), 'nan on empty cashflow');
 > end;
 > $$ language plpgsql;
@@ -326,20 +343,20 @@ internal_rate_of_return
 
 a 10k loan generates a cashflow. a 10% interest for the 10k loan, and 12% for reinvested profits
 ```
- > select modified_internal_rate_of_return(
- >   array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12);
-modified_internal_rate_of_return
-----------------------------------
-                0.151471336646763
+> select mirr(array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12);
+       mirr
+-------------------
+ 0.151471336646763
 ```
 
 
-### `net_present_value(rate, cashflow=[], dates=[])`
+### `finan.npv(rate, cashflow=[], dates=[])`
+net present value, with dated cashflow
 
 <!--
 ref: https://stackoverflow.com/questions/8919718/financial-python-library-that-has-xirr-and-xnpv-function
 
-> create or replace function net_present_value(
+> create or replace function npv(
 >   rate double precision,
 >   cashflow double precision[],
 >   dates date[] )
@@ -355,19 +372,19 @@ ref: https://stackoverflow.com/questions/8919718/financial-python-library-that-h
 
 a -1000 loan at 1/1/2018, returns cashflow as below with 10% discount rate; its values now is:
 ```
-> select net_present_value(
+> select npv(
 >   0.1,
 >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
 >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
-net_present_value
+     npv
 -------------------
 113.271525238905
 ```
 
-### `internal_rate_of_return(cashflow=[], dates=[])`
-
+### `finan.irr( cashflow=[], dates=[] )`
+internal reate of returns, with dated cashflow
 <!--
-> create or replace function internal_rate_of_return(
+> create or replace function irr(
 >   cashflow double precision[],
 >   dates date[] )
 > returns double precision as $$
@@ -391,20 +408,20 @@ net_present_value
 
 a -1000 loan at 1/1/2018, returns cashflow as below; rate of return for net-present-value ~ 0
 ```
-> select internal_rate_of_return(
+> select irr(
 >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
 >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
-internal_rate_of_return
--------------------------
-    0.204099471443879
+        irr
+-------------------
+ 0.204099471443879
 
-> select net_present_value(
+> select npv(
 >   0.204099471443879,
 >   array[-1000, 250, 250, 250, 250, 250]::double precision[],
 >   array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
-net_present_value
+         npv
 ----------------------
-3.38218342221808e-12
+ 3.38218342221808e-12
 ```
 
 ## [black-scholes option pricing](#black-scholes-option-pricing)

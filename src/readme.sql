@@ -26,12 +26,8 @@ select
 
 drop schema if exists finan_tests cascade;
 create schema finan_tests;
-
-
-
 drop schema if exists finan cascade;
 create schema finan;
-
 
 
 set schema 'finan';
@@ -47,7 +43,8 @@ set schema 'finan';
 
 
 
-create or replace function future_value(
+
+create or replace function fv (
       rate double precision,
       nper double precision,
       pmt double precision default 0,
@@ -58,17 +55,17 @@ returns double precision as $$
       return np.fv(rate, nper, pmt, pv, due)
 $$ language plpython3u immutable strict;
 
-create or replace function finan_tests.test_future_values() returns setof text as $$
+create or replace function finan_tests.test_fv() returns setof text as $$
 begin
-    return next ok(floor(future_value(0.1/4, 4*4, -2000, 0, 1)) = 39729, 'can calc');
-    return next ok(future_value(null, 4*4, -2000) is null, 'is strict');
+    return next ok(floor(fv(0.1/4, 4*4, -2000, 0, 1)) = 39729, 'can calc');
+    return next ok(fv(null, 4*4, -2000) is null, 'is strict');
 end;
 $$ language plpgsql;
 
 
 
 
-select future_value(0.05/12, 5*12, -1000);
+select fv(0.05/12, 5*12, -1000);
 
 
 
@@ -76,7 +73,7 @@ select future_value(0.05/12, 5*12, -1000);
 
 
 
-select future_value(0.1/4, 4*4, -2000, 0, 1);
+select fv(0.1/4, 4*4, -2000, 0, 1);
 
 
 
@@ -85,7 +82,8 @@ select future_value(0.1/4, 4*4, -2000, 0, 1);
 
 
 
-create or replace function present_value(
+
+create or replace function pv(
     rate double precision,
     nper double precision,
     pmt double precision,
@@ -96,17 +94,17 @@ returns double precision as $$
     return np.pv(rate, nper, pmt, fv, due)
 $$ language plpython3u strict;
 
-create or replace function finan_tests.test_present_values() returns setof text as $$
+create or replace function finan_tests.test_pv() returns setof text as $$
 begin
-    return next ok(floor(present_value(0.045/12, 5*12, -93.22)) = 5000, 'can calc');
-    return next ok(present_value(null, 5*12, -93.22) is null, 'is strict');
+    return next ok(floor(pv(0.045/12, 5*12, -93.22)) = 5000, 'can calc');
+    return next ok(pv(null, 5*12, -93.22) is null, 'is strict');
 end;
 $$ language plpgsql;
 
 
 
 
-select present_value(0.055/12, 5*12, 100);
+select pv(0.055/12, 5*12, 100);
 
 
 
@@ -114,7 +112,7 @@ select present_value(0.055/12, 5*12, 100);
 
 
 
-select present_value(0.045/12, 5*12, -93.22);
+select pv(0.045/12, 5*12, -93.22);
 
 
 
@@ -123,7 +121,8 @@ select present_value(0.045/12, 5*12, -93.22);
 
 
 
-create or replace function payment(
+
+create or replace function pmt(
     rate double precision,
     nper double precision,
     pv double precision,
@@ -134,17 +133,22 @@ returns double precision as $$
     return np.pmt(rate, nper, pv, fv, due)
 $$ language plpython3u immutable strict;
 
-create or replace function finan_tests.test_payment() returns setof text as $$
+create or replace function finan_tests.test_pmt() returns setof text as $$
 begin
-    return next ok(trunc(payment(0.045/12, 5*12, 5000)) = -93, 'can calc');
-    return next ok(payment(0.045, 5*12, null) is null, 'is strict');
+    return next ok(trunc(pmt(0.045/12, 5*12, 5000)) = -93, 'can calc');
+    return next ok(pmt(0.045, 5*12, null) is null, 'is strict');
 end;
 $$ language plpgsql;
 
 
 
 
-select payment(0.045/12, 5*12, 5000);
+select pmt(0.045/12, 5*12, 5000);
+
+
+
+
+select pmt(0.045/12, 5*12, 5000) * 5*12 + 5000 as total_interest_payments;
 
 
 
@@ -154,7 +158,8 @@ select payment(0.045/12, 5*12, 5000);
 
 
 
-create or replace function number_of_periods (
+
+create or replace function nper (
     rate double precision,
     pmt double precision,
     pv double precision,
@@ -168,7 +173,8 @@ $$ language plpython3u immutable strict;
 
 
 
-select number_of_periods(0.045/12, -100, 5000);
+select nper(0.045/12, -100, 5000);
+
 
 
 
@@ -201,7 +207,8 @@ select rate(5 * 12, -93.22, 5000) * 12;
 
 
 
-create or replace function principal_payment(
+
+create or replace function ppmt(
       rate double precision,
       per double precision,
       nper double precision,
@@ -215,8 +222,16 @@ $$ language plpython3u immutable strict;
 
 
 
+select ppmt(0.045/12, 12, 5*12, 5000);
 
-create or replace function interest_payment(
+
+
+
+
+
+
+
+create or replace function ipmt(
     rate double precision,
     per double precision,
     nper double precision,
@@ -231,19 +246,15 @@ $$ language plpython3u immutable strict;
 
 
 
-select payment(0.045/12, 5*12, 5000);
+select pmt(0.045/12, 5*12, 5000);
 
 
 
-select principal_payment(0.045/12, 12, 5*12, 5000);
+select ppmt(0.045/12, 12, 5*12, 5000);
 
 
 
-select interest_payment(0.045/12, 12, 5*12, 5000);
-
-
-
-
+select ipmt(0.045/12, 12, 5*12, 5000);
 
 
 
@@ -253,7 +264,12 @@ select interest_payment(0.045/12, 12, 5*12, 5000);
 
 
 
-create or replace function net_present_value(
+
+
+
+
+
+create or replace function npv(
     rate double precision,
     cashflow double precision[])
 returns double precision as $$
@@ -261,7 +277,7 @@ returns double precision as $$
     return np.npv(rate, cashflow)
 $$ language plpython3u immutable strict;
 
-create or replace function net_present_value(
+create or replace function npv(
     rate double precision[],
     cashflow double precision[])
 returns double precision as $$
@@ -272,7 +288,7 @@ $$ language plpython3u immutable strict;
 
 
 
-select net_present_value(
+select npv(
     0.1,
     array[-10000,3000,4200,6800]::double precision[]);
 
@@ -284,7 +300,8 @@ select net_present_value(
 
 
 
-create or replace function internal_rate_of_return(
+
+create or replace function irr (
     cashflow double precision[])
 returns double precision as $$
     import numpy as np
@@ -294,8 +311,7 @@ $$ language plpython3u immutable strict;
 
 
 
-select internal_rate_of_return(
-    array[-10000,3000,4200,6800]::double precision[]);
+select irr(array[-10000,3000,4200,6800]::double precision[]);
 
 
 
@@ -303,7 +319,8 @@ select internal_rate_of_return(
 
 
 
-create or replace function modified_internal_rate_of_return(
+
+create or replace function mirr(
     cashflow double precision[],
     rate double precision,     -- rate on cashflow
     reinvest_rate double precision) -- rate on cashflow reinvestment
@@ -314,10 +331,10 @@ $$ language plpython3u immutable strict;
 
 create or replace function finan_tests.test_modified_internal_rate_of_return() returns setof text as $$
 begin
-    return next ok(trunc(modified_internal_rate_of_return(
+    return next ok(trunc(mirr(
         array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12) * 100) = 15, 'can calc');
-    return next ok(modified_internal_rate_of_return(null, null, null) is null, 'is strict');
-    return next ok((modified_internal_rate_of_return(
+    return next ok(mirr(null, null, null) is null, 'is strict');
+    return next ok((mirr(
         array[]::double precision[], 0.1, 0.12) = 'NaN'), 'nan on empty cashflow');
 end;
 $$ language plpgsql;
@@ -326,6 +343,7 @@ $$ language plpgsql;
 
 
 
+select mirr(array[-10000,3000,4200,6800]::double precision[], 0.1, 0.12);
 
 
 
@@ -338,8 +356,7 @@ $$ language plpgsql;
 
 
 
-
-create or replace function net_present_value(
+create or replace function npv(
     rate double precision,
     cashflow double precision[],
     dates date[] )
@@ -355,7 +372,7 @@ $$ language plpython3u immutable strict;
 
 
 
-select net_present_value(
+select npv(
     0.1,
     array[-1000, 250, 250, 250, 250, 250]::double precision[],
     array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
@@ -367,7 +384,7 @@ select net_present_value(
 
 
 
-create or replace function internal_rate_of_return(
+create or replace function irr(
     cashflow double precision[],
     dates date[] )
 returns double precision as $$
@@ -391,14 +408,14 @@ $$ language plpython3u immutable strict;
 
 
 
-select internal_rate_of_return(
+select irr(
     array[-1000, 250, 250, 250, 250, 250]::double precision[],
     array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
 
 
 
 
-select net_present_value(
+select npv(
     0.204099471443879,
     array[-1000, 250, 250, 250, 250, 250]::double precision[],
     array['2018-1-1', '2018-6-1', '2018-12-1', '2019-3-1', '2019-9-1', '2019-12-30']::date[]);
