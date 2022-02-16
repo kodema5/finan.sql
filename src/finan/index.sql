@@ -1,5 +1,7 @@
 -- various finance related functions
 
+\ir csv_reads.sql
+
 \ir black_scholes.sql
 
 \ir fv.sql
