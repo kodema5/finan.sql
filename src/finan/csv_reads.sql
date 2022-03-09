@@ -3,7 +3,10 @@ create function finan.csv_reads(
     headers text[] default null,
     delimiter text default ',',
     newline text default e'\n'
-) returns setof jsonb as $$
+)
+    returns setof jsonb
+    language plpython3u
+as $$
     import csv
     import json
 
@@ -12,7 +15,7 @@ create function finan.csv_reads(
     rs = csv.DictReader(ls, headers, delimiter=delimiter)
     for r in rs:
         yield json.dumps(r)
-$$ language plpython3u;
+$$;
 
 -- example usage:
 

@@ -3,17 +3,25 @@
 create or replace function finan.irr (
     cashflow double precision[]
 )
-returns double precision as $$
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import numpy_financial as npf
     return npf.irr(cashflow)
-$$ language plpython3u immutable strict;
+$$;
 
 
 create or replace function finan.irr (
     cashflow double precision[],
     dates date[]
 )
-returns double precision as $$
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import scipy.optimize
     import datetime
     date_vals = list(map(lambda x: datetime.datetime.strptime(x,'%Y-%m-%d').date(), dates))
@@ -29,11 +37,14 @@ returns double precision as $$
     except RuntimeError:    # Failed to converge?
         return scipy.optimize.brentq(lambda r: xnpv(r, cashflow, date_vals), -1.0, 1e10)
 
-$$ language plpython3u immutable strict;
+$$;
 
 
 \if :test
-    create or replace function tests.test_finan_irr() returns setof text as $$
+    create or replace function tests.test_finan_irr()
+        returns setof text
+         language plpgsql
+    as $$
     begin
         return next ok(
             trunc(finan.irr(array[-10000,3000,4200,6800]::double precision[])::numeric,5) = 0.16340,
@@ -52,5 +63,5 @@ $$ language plpython3u immutable strict;
         end;
 
     end;
-    $$ language plpgsql;
+    $$;
 \endif

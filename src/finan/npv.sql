@@ -8,20 +8,28 @@ create or replace function finan.npv (
     rate double precision,
     cashflow double precision[]
 )
-returns double precision as $$
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import numpy_financial as npf
     return npf.npv(rate, cashflow)
-$$ language plpython3u immutable strict;
+$$;
 
 
 create or replace function finan.npv (
     rate double precision[],
     cashflow double precision[]
 )
-returns double precision as $$
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import numpy_financial as npf
     return [npf.npv(r, cashflow) for r in rate]
-$$ language plpython3u immutable strict;
+$$;
 
 
 create or replace function finan.npv (
@@ -29,19 +37,25 @@ create or replace function finan.npv (
     cashflow double precision[],
     dates date[]
 )
-returns double precision as $$
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import datetime
     if rate <= -1.0:
         return float('inf')
     date_vals = list(map(lambda x: datetime.datetime.strptime(x,'%Y-%m-%d').date(), dates))
     d0 = date_vals[0]
     return sum([ vi / (1.0 + rate) ** ((di - d0).days / 365) for vi, di in zip(cashflow, date_vals)])
-$$ language plpython3u immutable strict;
+$$;
 
 
 \if :test
     create or replace function tests.test_finan_npv()
-    returns setof text as $$
+        returns setof text
+         language plpgsql
+    as $$
     begin
         -- supposed a contract
         declare
@@ -61,5 +75,5 @@ $$ language plpython3u immutable strict;
             return next ok(trunc(a::numeric,2) = 113.27, 'calc net present value with dates');
         end;
     end;
-    $$ language plpgsql;
+    $$;
 \endif

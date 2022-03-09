@@ -3,19 +3,29 @@ create or replace function finan.normpdf(
     x double precision,
     loc double precision default 0.0,
     scale double precision default 1.0
-) returns double precision as $$
+)
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import scipy.stats
     return scipy.stats.norm.pdf(x,loc,scale)
-$$ language plpython3u immutable strict;
+$$;
 
 create or replace function finan.normcdf(
     x double precision,
     loc double precision default 0.0,
     scale double precision default 1.0
-) returns double precision as $$
+)
+    returns double precision
+    language plpython3u
+    immutable
+    strict
+as $$
     import scipy.stats
     return scipy.stats.norm.cdf(x,loc,scale)
-$$ language plpython3u immutable strict;
+$$;
 
 
 create type finan.black_scholes_t as (
@@ -40,7 +50,10 @@ create or replace function finan.black_scholes (
     T double precision, -- option expiration (in years)
     S double precision, -- asset volatility
     q double precision -- asset yield
-) returns finan.black_scholes_t as $$
+)
+    returns finan.black_scholes_t
+    language plpgsql
+as $$
 declare
     a finan.black_scholes_t;
 
@@ -92,11 +105,14 @@ begin
     a.vega = soeqt * sat * npd1;
     return a;
 end;
-$$ language plpgsql;
+$$;
 
 
 \if :test
-    create function tests.test_finan_black_scholes() returns setof text as $$
+    create function tests.test_finan_black_scholes()
+        returns setof text
+        language plpgsql
+    as $$
     begin
         declare
             a finan.black_scholes_t;
@@ -124,5 +140,5 @@ $$ language plpgsql;
         end;
 
     end;
-    $$ language plpgsql;
+    $$;
 \endif
