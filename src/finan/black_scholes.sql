@@ -1,112 +1,233 @@
+-- https://en.wikipedia.org/wiki/Black%E2%80%93Scholes_model
+create function finan.init_black_scholes()
+    returns void
+    language plpython3u
+    security definer
+as $$
+    fin = GD['finan']
+    sym = fin.sympy
 
-create or replace function finan.normpdf(
-    x double precision,
-    loc double precision default 0.0,
-    scale double precision default 1.0
+    ND = sym.stats.Normal('x', 0, 1)
+    pdf = sym.stats.density(ND)
+    cdf = sym.stats.cdf(ND)
+
+    S, K, r, tau, sigma = sym.symbols((
+        'S', # current price
+        'K', # strike/exercise price
+        'r', # risk-free interest rate
+        'tau', # time to maturity (T - t)
+        'sigma', # standard deviation of stock
+    ))
+
+    d1 = (sym.ln(S / K) + (r + sigma**2 / 2) * tau) / (sigma * sym.sqrt(tau))
+    d2 = d1 - (sigma * sym.sqrt(tau))
+
+    fin.bls_call = sym.lambdify(
+        [S,K,r,tau,sigma],
+        cdf(d1) * S - cdf(d2) * K * sym.exp(-r * tau))
+
+    fin.bls_put = sym.lambdify(
+        [S,K,r,tau,sigma],
+        cdf(-d2) * K * sym.exp(-r * tau) - cdf(-d1) * S)
+
+    fin.bls_delta_call = sym.lambdify(
+        [S,K,r,tau,sigma],
+        cdf(d1))
+
+    fin.bls_delta_put = sym.lambdify(
+        [S,K,r,tau,sigma],
+        -cdf(-d1))
+
+    fin.bls_gamma = sym.lambdify(
+        [S,K,r,tau,sigma],
+        pdf(-d1) / (S * sigma * sym.sqrt(tau)))
+
+
+    fin.bls_rho_call = sym.lambdify (
+        [S,K,r,tau,sigma],
+        K * tau * sym.exp(-r * tau) * cdf(d2))
+
+    fin.bls_rho_put = sym.lambdify (
+        [S,K,r,tau,sigma],
+        -K * tau * sym.exp(-r * tau) * cdf(-d2))
+
+    fin.bls_theta_call = sym.lambdify (
+        [S,K,r,tau,sigma],
+        - (S * pdf(d1) * sigma) / (2 * sym.sqrt(tau))
+        - r * K * sym.exp(-r * tau) * cdf(d2))
+
+    fin.bls_theta_put = sym.lambdify (
+        [S,K,r,tau,sigma],
+        - (S * pdf(d1) * sigma) / (2 * sym.sqrt(tau))
+        + r * K * sym.exp(-r * tau) * cdf(-d2))
+
+    fin.bls_vega = sym.lambdify(
+        [S,K,r,tau,sigma],
+        S * pdf(d1) * sym.sqrt(tau))
+
+$$;
+
+create function finan.bls_call (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
 )
     returns double precision
     language plpython3u
-    immutable
+    security definer
     strict
 as $$
-    import scipy.stats
-    return scipy.stats.norm.pdf(x,loc,scale)
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_call(s,k,r,tau,sigma)
 $$;
 
-create or replace function finan.normcdf(
-    x double precision,
-    loc double precision default 0.0,
-    scale double precision default 1.0
+create function finan.bls_put (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
 )
     returns double precision
     language plpython3u
-    immutable
+    security definer
     strict
 as $$
-    import scipy.stats
-    return scipy.stats.norm.cdf(x,loc,scale)
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_put(s,k,r,tau,sigma)
 $$;
 
 
-create type finan.black_scholes_t as (
-    call_price numeric,
-    call_delta numeric,
-    call_lambda numeric,
-    call_rho numeric,
-    call_theta numeric,
-    gamma numeric,
-    put_price numeric,
-    put_delta numeric,
-    put_lambda numeric,
-    put_rho numeric,
-    put_theta numeric,
-    vega numeric
-);
-
-create or replace function finan.black_scholes (
-    SO double precision, -- current price
-    X double precision, -- exercise price of option
-    r double precision, -- risk-free rate over option period
-    T double precision, -- option expiration (in years)
-    S double precision, -- asset volatility
-    q double precision -- asset yield
+create function finan.bls_delta_call (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
 )
-    returns finan.black_scholes_t
-    language plpgsql
+    returns double precision
+    language plpython3u
+    security definer
+    strict
 as $$
-declare
-    a finan.black_scholes_t;
-
-    sat double precision = sqrt(t);
-    ssat double precision = s * sat;
-    ert double precision = exp(-r * t);
-    xert double precision = x * ert;
-    xertr double precision = xert * r;
-
-    d1 double precision = (ln(so / x) + (r + s*s*0.5) * t) / ssat;
-    d2 double precision = d1 - ssat;
-    d3 double precision = xert * t;
-
-    ncd1 double precision = finan.normcdf(d1);
-    ncd2 double precision = finan.normcdf(d2);
-    ncmd1 double precision = finan.normcdf(-d1);
-    ncmd2 double precision = finan.normcdf(-d2);
-    npd1 double precision = finan.normpdf(d1);
-    ncd1m1 double precision = ncd1 - 1;
-
-    eqt double precision = exp(-q * t);
-    soeqt double precision = so * eqt;
-    soeqtq double precision = soeqt * q;
-
-    b double precision = -soeqt * npd1 * s / (2.0 * sat);
-begin
-    a.call_price = soeqt * ncd1 - xert * ncd2;
-    a.put_price = xert * ncmd2 - soeqt * ncmd1;
-
-    a.call_delta = eqt * ncd1;
-    a.put_delta = a.call_delta - eqt;
-
-    a.gamma = npd1 * eqt / (ssat * so);
-
-    if a.call_price>=(1e-14) and a.put_price>=(1e-14) then
-        a.call_lambda = so / a.call_price * ncd1;
-        a.put_lambda  = case
-            when ncd1m1 < 1e-6 then so / a.put_price * (-ncmd1)
-            else so / a.put_price * ncd1m1
-            end;
-    end if;
-
-    a.call_rho = d3 * ncd2;
-    a.put_rho = -d3 * ncmd2;
-
-    a.call_theta = b + soeqtq * ncd1 - xertr * ncd2;
-    a.put_theta = b - soeqtq * ncmd1 + xertr * ncmd2;
-
-    a.vega = soeqt * sat * npd1;
-    return a;
-end;
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_delta_call(s,k,r,tau,sigma)
 $$;
 
+
+create function finan.bls_delta_put (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_delta_put(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_gamma (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_gamma(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_rho_call (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_rho_call(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_rho_put (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_rho_put(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_theta_call (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_theta_call(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_theta_put (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_theta_put(s,k,r,tau,sigma)
+$$;
+
+create function finan.bls_vega (
+    S double precision,
+    K double precision,
+    r double precision,
+    tau double precision,
+    sigma double precision
+)
+    returns double precision
+    language plpython3u
+    security definer
+    strict
+as $$
+    if 'finan' not in GD: plpy.execute("select finan.init()")
+    return GD['finan'].bls_vega(s,k,r,tau,sigma)
+$$;
 
 \if :test
     create function tests.test_finan_black_scholes()
@@ -114,31 +235,22 @@ $$;
         language plpgsql
     as $$
     begin
-        declare
-            a finan.black_scholes_t;
-        begin
-            a = finan.black_scholes(50, 50, 0.12, 0.25, 0.3, 0);
+        return next ok(trunc(finan.bls_call(50, 50, 0.12, 0.25, 0.3)::numeric,2) = 3.74, 'can call price');
+        return next ok(trunc(finan.bls_put(50, 50, 0.12, 0.25, 0.3)::numeric,2) = 2.26, 'can put price');
 
-            return next ok(trunc(a.call_price,2) = 3.74, 'call price');
-            return next ok(trunc(a.put_price,2) = 2.26, 'put price');
+        return next ok(trunc(finan.bls_delta_call(50, 50, 0.12, 0.25, 0.3)::numeric,2) = 0.60, 'can delta call');
+        return next ok(trunc(finan.bls_delta_put(50, 50, 0.12, 0.25, 0.3)::numeric,2) = -0.39, 'can delta put');
 
-            return next ok(trunc(a.call_delta,2) = 0.60, 'call delta');
-            return next ok(trunc(a.put_delta,2) = -0.39, 'put delta');
+        return next ok(trunc(finan.bls_gamma(50, 50, 0.12, 0.25, 0.3)::numeric,6) = 0.051218, 'can gamma');
 
-            return next ok(trunc(a.gamma,6) = 0.051218, 'gamma');
+        return next ok(trunc(finan.bls_rho_call(50, 50, 0.12, 0.25, 0.3)::numeric,2) = 6.66, 'can rho call');
+        return next ok(trunc(finan.bls_rho_put(50, 50, 0.12, 0.25, 0.3)::numeric,2) = -5.46, 'can rho put');
 
-            return next ok(trunc(a.call_lambda,2) = 8.12, 'call lambda');
-            return next ok(trunc(a.put_lambda,2) = -8.64, 'put lambda');
+        return next ok(trunc(finan.bls_theta_call(50, 50, 0.12, 0.25, 0.3)::numeric,2) = -8.96, 'can theta call');
+        return next ok(trunc(finan.bls_theta_put(50, 50, 0.12, 0.25, 0.3)::numeric,2) = -3.14, 'can theta put');
 
-            return next ok(trunc(a.call_rho,2) = 6.66, 'call rho');
-            return next ok(trunc(a.put_rho,2) = -5.46, 'put rho');
-
-            return next ok(trunc(a.call_theta,2) = -8.96, 'call theta');
-            return next ok(trunc(a.put_theta,2) = -3.14, 'put theta');
-
-            return next ok(trunc(a.vega,2) = 9.60, 'vega');
-        end;
-
+        return next ok(trunc(finan.bls_vega(50, 50, 0.12, 0.25, 0.3)::numeric,2) = 9.60, 'can vega');
     end;
     $$;
+
 \endif
